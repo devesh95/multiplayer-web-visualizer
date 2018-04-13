@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Multiplayar Server View</title>
+  <link href="https://fonts.googleapis.com/css?family=Roboto" rel="stylesheet">
+  <script   src="https://code.jquery.com/jquery-3.3.1.min.js"   integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8="   crossorigin="anonymous"></script>
+  <style>
+    * {
+        -webkit-box-sizing: border-box;
+        -moz-box-sizing: border-box;
+        box-sizing: border-box;
+    }
+
+    html, body {
+        height: 100%;
+        width: 100%;
+        font-family: 'Roboto', sans-serif;
+        background-color: #E5EFF1;
+    }
+
+    hr {
+      width: 80%;
+    }
+
+    h1 {
+      text-align: center;
+      margin: 20px;
+      width: 100%;
+      font-size: 48px;
+    }
+
+    h3 {
+      text-align: center;
+      font-size: 28px;
+    }
+
+    .two div {
+        width: 50%;
+        height: 50%;
+        float: left;
+        padding-bottom: 20px;
+    }
+
+    .one div {
+        width: 100%;
+        height: 100%;
+        float: left;
+    }
+
+    ./*image {
+      display: none;
+    }*/
+
+    img.screen {
+      width: 270px;
+      height: 480px;
+      display: block;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .loading {
+      width: 400px;
+      height: 400px;
+      display: block;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+  </style>
+</head>
+<body>
+  <h1>Multiplayar&trade; Anchor Resolution</h1>
+  <hr/>
+  <h3>Stage 1 - Raw Image Feeds</h3>
+    <div class="two">
+      <div class="image">
+        <img id="stage1-1" class="screen loading" src="https://media.giphy.com/media/xTk9ZvMnbIiIew7IpW/giphy.gif">
+        <h3>Client 1 View</h3>
+      </div>
+      <div class="image">
+        <img id="stage1-2" class="screen loading" src="https://media.giphy.com/media/xTk9ZvMnbIiIew7IpW/giphy.gif">
+        <h3>Client 2 View</h3>
+      </div>
+    </div>
+  <hr />
+  <h3>Stage 2 - SIFT + ARKit Keypoints</h3>
+  <div class="two">
+    <div class="image">
+      <img id="stage2-1" class="screen loading" src="https://media.giphy.com/media/xTk9ZvMnbIiIew7IpW/giphy.gif">
+      <h3>Client 1 Keypoints</h3>
+    </div>
+    <div class="image">
+      <img id="stage2-2" class="screen loading" src="https://media.giphy.com/media/xTk9ZvMnbIiIew7IpW/giphy.gif">
+      <h3>Client 2 Keypoints</h3>
+    </div>
+  </div>
+  <hr />
+  <h3>Stage 3 - SIFT Generated Matching</h3>
+  <div class="one">
+    <div class="image">
+      <img id="stage3" class="loading" src="https://media.giphy.com/media/xTk9ZvMnbIiIew7IpW/giphy.gif" width="100%" height="100%">
+      <h3>Matchings are between both images, based on keypoints.</h3>
+    </div>
+  </div>
+  <div>
+  <hr />
+  <h3>Stage 4 - Multiplayar&trade; Filtering</h3>
+  <div class="one">
+    <div class="image">
+      <img id="stage4" class="loading" src="https://media.giphy.com/media/xTk9ZvMnbIiIew7IpW/giphy.gif" width="100%" height="100%">
+      <h3>The best matches are chosen based on centrality around the ARKit keypoints.</h3>
+    </div>
+  </div>
+  </div>
+  <script>
+    var domainURL = "/";
+    var endpointID = "ids";
+    var endpointImage = "imagequery";
+    var currentStage = 1;
+    var currentImage = 1;
+
+    var id1 = "";
+    var id2 = ""
+
+    var requestIDs = function(data) {
+      $.ajax({
+        type: "GET",
+        url: domainURL + endpointID
+      })
+      .done(function( msg ) {
+        msg = JSON.parse(msg)
+        console.log(msg);
+        if (msg && msg.ids && msg.ids.length == 2) {
+          id1 = msg.ids[0].id;
+          id2 = msg.ids[1].id;
+          requestImage({
+            id: id1,
+          });
+        } else {
+          setTimeout(requestIDs, 1000);
+        }
+      });
+    }
+
+    function hexToBase64(str) {
+      return btoa(String.fromCharCode.apply(null, str.replace(/\r|\n/g, "").replace(/([\da-fA-F]{2}) ?/g, "0x$1 ").replace(/ +$/, "").split(" ")));
+    }
+
+    function setImage(location, content) {
+      $(location).attr('src', content).parent().css('display', 'block');
+    }
+
+    var requestImage = function(data) {
+      console.log("requesting image")
+      if (currentStage > 4) {
+        return; // whoops
+      }
+      var cssData = {
+        width: '270px',
+        height: '480px',
+        display: 'block',
+        'margin-left': 'auto',
+        'margin-right': 'auto'
+      }
+      data.stage = currentStage;
+      $.ajax({
+        type: "POST",
+        url: domainURL + endpointImage,
+        data: data,
+      })
+      .done(function( msg ) {
+        if (msg && msg.length) {
+          if (currentStage <= 2) {
+            if (currentImage == 1) {
+              $("#stage" + currentStage + "-" + currentImage).attr('src', 'data:image/png;base64,' + msg).css(cssData);
+              currentImage++; // stay in the same stage, but move to the second image
+              requestImage({
+                id: id2
+              });
+            } else {
+              $("#stage" + currentStage + "-" + currentImage).attr('src', 'data:image/png;base64,' + msg).css(cssData);
+              currentStage++;   // move to the next stage!
+              currentImage = 1; // first image in the next stage
+              if (currentStage == 2) {
+                requestImage({
+                  id: id1
+                });
+              } else {
+                requestImage({
+                  id1: id1,
+                  id2: id2
+                });
+              }
+            }
+          } else {
+            $("#stage" + currentStage).attr('src', 'data:image/png;base64,' + msg).css(cssData).css('width', '540px');
+            currentStage++;
+            if (currentStage == 4) {
+              requestImage({
+                id1: id1,
+                id2: id2
+              });
+            }
+          }
+        } else {
+          // no image ready, try again in 1000 ms
+          setTimeout(function() {
+            requestImage(data);
+          }, 1000);
+        }
+      });
+    }
+
+    // first request IDs
+    requestIDs();
+  </script>
+</body>
+</html>
